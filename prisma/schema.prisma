@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id          String    @id
+  shop        String
+  state       String
+  isOnline    Boolean   @default(false)
+  scope       String?
+  expires     DateTime?
+  accessToken String
+  userId      BigInt?
+}
+
+model priceDrop {
+  id               Int      @id @default(autoincrement())
+  title            String
+  shop             String
+  productId        String
+  productTitle     String?
+  productHandle    String
+  productVariantId String
+  originalPrice    String
+  productImage     String?
+  productAlt       String? 
+  oldPriceDrop     String?
+  priceDrop        String?
+  dropRangeFrom    String
+  dropRangeTo      String
+  dropTime         String
+  createdAt        DateTime @default(now())
+}
+
+model testt {
+  id               Int      @id @default(autoincrement())
+  title            String
+}
