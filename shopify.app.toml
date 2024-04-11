@@ -3,7 +3,7 @@
 client_id = "264f3f23a6c75159cb21ee8fdda1914c"
 name = "product-price-drop"
 handle = "product-price-drop"
-application_url = "https://fight-florida-newfoundland-ana.trycloudflare.com"
+application_url = "https://desert-dome-journalism-copyrighted.trycloudflare.com"
 embedded = true
 
 [build]
@@ -17,9 +17,9 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://fight-florida-newfoundland-ana.trycloudflare.com/auth/callback",
-  "https://fight-florida-newfoundland-ana.trycloudflare.com/auth/shopify/callback",
-  "https://fight-florida-newfoundland-ana.trycloudflare.com/api/auth/callback"
+  "https://desert-dome-journalism-copyrighted.trycloudflare.com/auth/callback",
+  "https://desert-dome-journalism-copyrighted.trycloudflare.com/auth/shopify/callback",
+  "https://desert-dome-journalism-copyrighted.trycloudflare.com/api/auth/callback"
 ]
 
 [webhooks]

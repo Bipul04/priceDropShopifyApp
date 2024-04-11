@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActionFunction, LoaderFunction } from "@remix-run/node";
+import { ActionFunction, LoaderFunction, redirect } from "@remix-run/node";
 import {
   useLoaderData,
   useNavigation,
@@ -49,9 +49,8 @@ type priceDropProduct = {
 
 var isNew = false;
 export const loader: LoaderFunction = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const priceDrops = await getPriceDrops(session.shop);
-  console.log("priceDropspriceDrops", priceDrops.length)
 
   if (priceDrops.length === 0) {
     isNew = true;
@@ -62,10 +61,9 @@ export const loader: LoaderFunction = async ({ request }) => {
   return priceDrops[0];
 };
 
-
 export const action: ActionFunction = async ({ request }) => {
   try {
-    const { session } = await authenticate.admin(request);
+    const { admin, session } = await authenticate.admin(request);
     const { shop } = session;
 
     const formData = await request.formData();
@@ -76,7 +74,6 @@ export const action: ActionFunction = async ({ request }) => {
 
     // Assuming hasId is passed in the request data
     const { hasId, ...data } = newData;
-    console.log("dataaa", isNew, data)
     if (isNew === true) {
       const priceDrop = await db.priceDrop.create({ data });
       isNew = false;
@@ -88,6 +85,8 @@ export const action: ActionFunction = async ({ request }) => {
         },
         data: data
       });
+
+      updatePriceDropMetafield(admin.graphql);
       return priceDrop;
     }
 
@@ -97,6 +96,33 @@ export const action: ActionFunction = async ({ request }) => {
   }
 };
 
+async function updatePriceDropMetafield(graphql: any) {
+  const response = await graphql(
+    `
+    query   {
+      metaobjects(type:"price_drop", first:10) {
+         edges{
+             node{
+                 displayName
+                 capabilities{
+                     onlineStore{
+                         templateSuffix
+                     }
+                     publishable{
+                         status
+                     }
+                 }
+                 
+             }
+         }
+}
+   }
+    `
+  );
+
+  const data = await response.json();
+  console.log("adksjgkagdsadksj", data)
+}
 export default function priceDropForm() {
 
   const priceDrop: priceDropProduct = useLoaderData();
@@ -155,8 +181,6 @@ export default function priceDropForm() {
     // submit(data, { method: "post" });
 
     submit(data, { method: "post" });
-    console.log("rtrtrwaaa", priceDrop)
-
   }
 
 

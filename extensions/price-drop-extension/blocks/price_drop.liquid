@@ -1,0 +1,47 @@
+{% assign shop_metaobject = shop.metaobjects.price_drop.values | first %}
+{% assign title = shop_metaobject.title %}
+{% assign next_price_drop = shop_metaobject.next_price_drop %}
+{% assign last_price_drop = shop_metaobject.last_price_drop %}
+{% assign selected_product = shop_metaobject.product.value %}
+{% assign current_price = selected_product.price | money %}
+{% assign image_src = selected_product.featured_image.src %}
+
+<section calss="price-drop-section pds-{{section.id}}">
+    <div class="pds-container">
+        <div class="image-container">
+            <img srcset="
+              {%- if selected_product.featured_media.width >= 165 -%}{{ selected_product.featured_media | image_url: width: 165 }} 165w,{%- endif -%}
+              {%- if selected_product.featured_media.width >= 360 -%}{{ selected_product.featured_media | image_url: width: 360 }} 360w,{%- endif -%}
+              {%- if selected_product.featured_media.width >= 533 -%}{{ selected_product.featured_media | image_url: width: 533 }} 533w,{%- endif -%}
+              {%- if selected_product.featured_media.width >= 720 -%}{{ selected_product.featured_media | image_url: width: 720 }} 720w,{%- endif -%}
+              {%- if selected_product.featured_media.width >= 940 -%}{{ selected_product.featured_media | image_url: width: 940 }} 940w,{%- endif -%}
+              {%- if selected_product.featured_media.width >= 1066 -%}{{ selected_product.featured_media | image_url: width: 1066 }} 1066w,{%- endif -%}
+              {{ selected_product.featured_media | image_url }} {{ selected_product.featured_media.width }}w
+            " src="{{ selected_product.featured_media | image_url: width: 533 }}"
+                alt="{{ selected_product.featured_media.alt | escape }}" class="motion-reduce" loading="lazy"
+                width="{{ selected_product.featured_media.width }}"
+                height="{{ selected_product.featured_media.height }}">
+        </div>
+        <div class="pds-details-wrapper">
+            <div class="pds-details-container">
+                <p>Next Price Drop: <span class="next-price-drop">3m 22s</span></p>
+                <p>Last Price Drop: <span class="next-price-drop">{{ last_price_drop }}</span></p> 
+                <p>Current Price: <span class="next-price-drop">{{ current_price }}</span></p>
+            </div>
+            <div class="pds-details-btn-container">
+                <a href="/checkout" class="button button-outline">Order Now</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% schema %}
+{
+"name": "Price Drop",
+"target": "section",
+"settings": [
+{ "type": "product", "id": "product", "label": "product", "autofill": true },
+{ "type": "color", "id": "colour", "label": "Star Colour", "default": "#ff0000" }
+]
+}
+{% endschema %}
