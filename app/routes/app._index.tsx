@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ActionFunction, LoaderFunction, redirect } from "@remix-run/node";
 import {
   useLoaderData,
@@ -24,41 +24,18 @@ import {
   Thumbnail,
   BlockStack,
   PageActions,
+  Checkbox,
 } from "@shopify/polaris";
 import { FormsIcon, ImageIcon } from "@shopify/polaris-icons";
 import db from "../db.server";
 import { getPriceDrops } from "../models/priceDrop.server";
-
-type priceDropProduct = {
-  id: number;
-  title: string;
-  shop: string;
-  productId: string;
-  productHandle: string;
-  productTitle: string;
-  productAlt: string;
-  productImage: string;
-  productVariantId: string;
-  originalPrice: string;
-  oldPriceDrop: string;
-  priceDrop: string;
-  dropRangeFrom: string;
-  dropRangeTo: string;
-  dropTime: string;
-}
+import { arrangePriceDrop, getMetaObjectGraphql, getProductInfo, updatePriceDropMetafield } from "~/config/allFunctions";
 
 var isNew = false;
-export const loader: LoaderFunction = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const priceDrops = await getPriceDrops(session.shop);
 
-  if (priceDrops.length === 0) {
-    isNew = true;
-    return [];
-  } else {
-    isNew = false;
-  }
-  return priceDrops[0];
+export const loader: LoaderFunction = async ({ request }) => {
+  const { admin, session } = await authenticate.admin(request);
+  return getMetaObjectGraphql(admin, isNew);
 };
 
 export const action: ActionFunction = async ({ request }) => {
@@ -73,20 +50,20 @@ export const action: ActionFunction = async ({ request }) => {
     };
 
     // Assuming hasId is passed in the request data
-    const { hasId, ...data } = newData;
+    const { hasId, productChanged, enableCornJobChanged, timeBetweenPriceDropChanged, ...data } = newData;
     if (isNew === true) {
       const priceDrop = await db.priceDrop.create({ data });
       isNew = false;
       return priceDrop;
     } else {
-      const priceDrop = await db.priceDrop.update({
-        where: {
-          id: parseInt(hasId)
-        },
-        data: data
-      });
+      // const priceDrop = await db.priceDrop.update({
+      //   where: {
+      //     id: parseInt(hasId)
+      //   },
+      //   data: data
+      // });
 
-      updatePriceDropMetafield(admin.graphql);
+      const priceDrop = await updatePriceDropMetafield(admin, newData); // Assuming updatePriceDropMetafield returns a promise
       return priceDrop;
     }
 
@@ -96,39 +73,18 @@ export const action: ActionFunction = async ({ request }) => {
   }
 };
 
-async function updatePriceDropMetafield(graphql: any) {
-  const response = await graphql(
-    `
-    query   {
-      metaobjects(type:"price_drop", first:10) {
-         edges{
-             node{
-                 displayName
-                 capabilities{
-                     onlineStore{
-                         templateSuffix
-                     }
-                     publishable{
-                         status
-                     }
-                 }
-                 
-             }
-         }
-}
-   }
-    `
-  );
 
-  const data = await response.json();
-  console.log("adksjgkagdsadksj", data)
-}
+
 export default function priceDropForm() {
 
-  const priceDrop: priceDropProduct = useLoaderData();
+  const priceDrop: PriceDropProduct = useLoaderData();
 
-  const [formState, setFormState] = useState<priceDropProduct>(priceDrop);
-  const [cleanFormState, setCleanFormState] = useState<priceDropProduct>(priceDrop);
+  const [formState, setFormState] = useState<PriceDropProduct>(priceDrop);
+  const [cleanFormState, setCleanFormState] = useState<PriceDropProduct>(priceDrop);
+  const [productChanged, setProductChanged] = useState<boolean>(false);
+  const [enableCornJobChanged, setEnableCornJobChanged] = useState<boolean>(false);
+  const [timeBetweenPriceDropChanged, setTimeBetweenPriceDropChanged] = useState<boolean>(false);
+
   const isDirty = JSON.stringify(formState) !== JSON.stringify(cleanFormState);
 
   const nav = useNavigation();
@@ -140,11 +96,22 @@ export default function priceDropForm() {
   async function selectProduct() {
     const products = await window.shopify.resourcePicker({
       type: "product",
-      action: "add", // customized action verb, either 'select' or 'add',
+      action: "select", // customized action verb, either 'select' or 'add',
+      filter: {
+        hidden: true,
+        variants: false,
+        draft: false,
+        archived: false,
+      },
     });
 
     if (products) {
       const { images, id, variants, title, handle, price } = products[0];
+      if (formState.productId != id) {
+        setProductChanged(true);
+      } else if (formState.productId === id) {
+        setProductChanged(false);
+      }
 
       setFormState({
         ...formState,
@@ -154,34 +121,63 @@ export default function priceDropForm() {
         productHandle: handle,
         productAlt: String(images[0]?.altText),
         productImage: images[0]?.originalSrc,
-        originalPrice: price
+        originalPrice: price,
       });
     }
   }
-
   const submit = useSubmit();
-  function handleSave() {
-    const data = {
-      title: formState.title,
-      productId: formState.productId || "",
-      productVariantId: formState.productVariantId || "",
-      productHandle: formState.productHandle || "",
-      productTitle: formState.productTitle,
-      productAlt: formState.productAlt,
-      productImage: formState.productImage,
-      originalPrice: formState.originalPrice || "100.00",
-      oldPriceDrop: formState.oldPriceDrop || "4.95",
-      priceDrop: formState.priceDrop || "95.05",
-      dropRangeFrom: formState.dropRangeFrom || "",
-      dropRangeTo: formState.dropRangeTo || "",
-      dropTime: formState.dropTime || "",
-      hasId: formState.id,
-    };
-    // setCleanFormState({ ...formState });
-    // submit(data, { method: "post" });
-
-    submit(data, { method: "post" });
+  async function handleSave() {
+    try {
+      const data = {
+        title: formState.title,
+        enable_price_drop: formState.enable_price_drop,
+        productId: formState.productId || "",
+        productVariantId: formState.productVariantId || "",
+        productHandle: formState.productHandle || "",
+        productTitle: formState.productTitle,
+        productAlt: formState.productAlt || "",
+        productImage: formState.productImage,
+        originalPrice: formState.originalPrice || "",
+        last_price_drop_value: formState.last_price_drop_value || "",
+        priceDrop: formState.priceDrop || "",
+        percentage_drop_from: formState.percentage_drop_from || "",
+        percentage_drop_to: formState.percentage_drop_to || "",
+        time_between_price_drop: formState.time_between_price_drop || "",
+        hasId: formState.id,
+        productChanged: productChanged,
+        enableCornJobChanged: enableCornJobChanged,
+        timeBetweenPriceDropChanged: timeBetweenPriceDropChanged,
+      };
+      const response = submit(data, { method: "post" });
+      console.log("Response:", response); // Print the response
+      shopify.toast.show('Changes saved', { duration: 5000 });
+    } catch (error) {
+      console.error("Error:", error); // Handle any errors
+      shopify.toast.show('Failed to save changes', { duration: 5000 });
+    }
   }
+
+
+
+  const handleCornJobEnable = useCallback(
+    (newEnableCornJob: boolean) => {
+      const originalEnablePriceDrop = formState.enable_price_drop;
+      const enableCornJobChanged = newEnableCornJob !== originalEnablePriceDrop;
+      setEnableCornJobChanged(enableCornJobChanged);
+      setFormState({ ...formState, enable_price_drop: newEnableCornJob });
+    },
+    [formState]
+  );
+  const handleTimeBetweenPriceDropChange = useCallback(
+    (newTimeBetweenPriceDrop: string) => {
+      const originalTimeBetweenPriceDrop = formState.time_between_price_drop;
+      const timeBetweenPriceDropChanged = newTimeBetweenPriceDrop !== originalTimeBetweenPriceDrop;
+
+      setTimeBetweenPriceDropChanged(timeBetweenPriceDropChanged);
+      setFormState({ ...formState, time_between_price_drop: newTimeBetweenPriceDrop });
+    },
+    [formState]
+  );
 
 
   return (
@@ -204,6 +200,13 @@ export default function priceDropForm() {
                   autoComplete="off"
                   value={formState.title}
                   onChange={(title) => setFormState({ ...formState, title })}
+                  disabled
+                />
+                <Checkbox
+                  label="Enable Timer to Start"
+                  id="enable_price_drop"
+                  checked={formState.enable_price_drop}
+                  onChange={handleCornJobEnable}
                 />
               </BlockStack>
             </Card>
@@ -255,22 +258,22 @@ export default function priceDropForm() {
                   <TextField
                     label="From"
                     type="number"
-                    id="dropRangeFrom"
+                    id="percentage_drop_from"
                     min={0}
                     max={100}
                     autoComplete="off"
-                    value={formState.dropRangeFrom}
-                    onChange={(dropRangeFrom) => setFormState({ ...formState, dropRangeFrom })}
+                    value={formState.percentage_drop_from}
+                    onChange={(percentage_drop_from) => setFormState({ ...formState, percentage_drop_from })}
                   />
                   <TextField
                     label="To"
                     type="number"
-                    id="dropRangeTo"
+                    id="percentage_drop_to"
                     min={0}
                     max={100}
                     autoComplete="off"
-                    value={formState.dropRangeTo}
-                    onChange={(dropRangeTo) => setFormState({ ...formState, dropRangeTo })}
+                    value={formState.percentage_drop_to}
+                    onChange={(percentage_drop_to) => setFormState({ ...formState, percentage_drop_to })}
                   />
                 </InlineStack>
                 <Bleed marginInlineStart="200" marginInlineEnd="200">
@@ -285,9 +288,10 @@ export default function priceDropForm() {
                     type="number"
                     autoComplete="off"
                     prefix="Min"
-                    id="dropTime"
-                    value={formState.dropTime}
-                    onChange={(dropTime) => setFormState({ ...formState, dropTime })}
+                    id="time_between_price_drop"
+                    value={formState.time_between_price_drop}
+                    // onChange={(time_between_price_drop) => setFormState({ ...formState, time_between_price_drop })}
+                    onChange={handleTimeBetweenPriceDropChange}
                   />
                 </InlineStack>
 
